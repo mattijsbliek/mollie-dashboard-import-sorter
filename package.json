@@ -6,6 +6,9 @@
   "dependencies": {
     "fast-glob": "^3.2.4"
   },
+  "bin": {
+    "sort-imports": "index.js"
+  },
   "scripts": {
     "run": "node ./index.js"
   }
