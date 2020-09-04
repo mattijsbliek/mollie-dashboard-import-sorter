@@ -1,3 +1,5 @@
+#!/usr/bin/env node
+
 const fg = require('fast-glob');
 const fs = require('fs').promises;
 const utils = require('./utils');
