@@ -2,7 +2,7 @@
  * Line utils 
  */
 exports.getPathFromImport = line => {
-  const [_, path] = line.match(/^import\ (?:.+)\ from\ ['"](.+)['"];$/);
+  const [_, path] = line.match(/^import\ (?:.+)\ from\ ['"](.+)['"];$/gm);
 
   return path;
 }

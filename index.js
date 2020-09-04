@@ -1,51 +1,58 @@
 const fg = require('fast-glob');
 const fs = require('fs').promises;
-const { findLastIndex } = require('lodash');
 const utils = require('./utils');
 
+const importRegexp = /^import (?:.|\n)+? from [\'\"](.+?)[\'\"];/;
+
 class ImportSorter {
+	numberOfChangedFiles = 0;
+
 	processFile = (file) => {
 		if (!utils.fileHasImports(file)) {
 			return;
 		}
 
-		const lines = file.split('\n');
+		const imports = file.match(new RegExp(importRegexp, 'gm'));
+		const lastImport = imports[imports.length - 1];
 
-		const lastLineWithImport = findLastIndex(lines, utils.lineIsImport);
-
-		const rest = lines.slice(lastLineWithImport + 1);
+		const rest = file.slice(file.indexOf(lastImport) + lastImport.length);
 
 		// Collect different import types
 		const nodeImports = [];
 		const rootRelativeImports = [];
 		const relativeImports = [];
 
-		lines.slice(0, lastLineWithImport + 1).map(line => {
-			if (!utils.lineIsImport(line)) {
-				return;
-			}
-
-			const path = utils.getPathFromImport(line);
+		imports.map(imp => {
+			const [_, path] = imp.match(new RegExp(importRegexp, 'm'));
 
 			if (utils.isRelativeImport(path)) {
-				relativeImports.push(line);
+				relativeImports.push(imp);
 				return;
 			}
 
 			if (utils.isRootRelativeImport(path)) {
-				rootRelativeImports.push(line);
+				rootRelativeImports.push(imp);
 				return;
 			}
 
-			nodeImports.push(line);
+			nodeImports.push(imp);
 		});
 
+		this.numberOfChangedFiles++;
+
 		// Sort imports and append rest of the file
-		return [...nodeImports, ...rootRelativeImports, ...relativeImports, ...rest].join('\n');
+		return [...nodeImports, ...rootRelativeImports, ...relativeImports].join('\n').concat(rest);
 	}
 
 	async run() {
-		const stream = fg.stream(['!node_modules', 'src/components/**/*.{ts,tsx}']);
+		const directory = process.argv[2];
+
+		if (!directory) {
+			console.error('Missing a directory argument, add it like so: "npx mollie-import-sorter src/components/UI"');
+			return;
+		}
+
+		const stream = fg.stream(['!node_modules', `${directory.replace(/\/$/, "")}/**/*.{ts,tsx}`]);
 		for await (const filename of stream) {
 			console.log(`Processing ${filename}`);
 
@@ -57,14 +64,14 @@ class ImportSorter {
 					return;
 				}
 
-				fs.writeFile(filename, file, 'utf-8').then(() => {
-					console.log(`Sorted imports for file ${filename}`);
-				});
+				fs.writeFile(filename, file, 'utf-8');
 			})
 			.catch(err => {
-				console.log(`Could not read ${filename}: ${err}`);
+				console.warn(`Something went wrong while processing ${filename}: ${err}`);
 			});
 		}
+
+		console.log(`Done processing, ${this.numberOfChangedFiles} files were updated`);
 	}
 };
 
