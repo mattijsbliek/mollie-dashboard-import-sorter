@@ -50,7 +50,7 @@ class ImportSorter {
 		const directory = process.argv[2];
 
 		if (!directory) {
-			console.error('Missing a directory argument, add it like so: "npx mollie-import-sorter src/components/UI"');
+			console.error('Missing a directory argument, add it like so: "./node_modules/.bin/mollie-import-sorter src/components/UI"');
 			return;
 		}
 
