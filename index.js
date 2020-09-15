@@ -4,7 +4,13 @@ const fg = require('fast-glob');
 const fs = require('fs').promises;
 const utils = require('./utils');
 
-const importRegexp = /^import (?:.|\n)+? from [\'\"](.+?)[\'\"];/;
+// Matches ES6 imports
+// https://regexr.com/47jlq
+const importRegexp = /^import\s+?(?:(?:(?:[\w*\s{},]*)\s+from\s+?)|)(?:(?:".*?")|(?:'.*?'))[\s]*?(?:;|$|)/;
+// Matches text between two single quotes
+const pathRegexp = /(?<=')[^']+(?=')/;
+// Matches comment blocks
+const commentBlockRegexp = /^\/\*(\*(?!\/)|[^*])*\*\//;
 
 class ImportSorter {
 	numberOfChangedFiles = 0;
@@ -14,18 +20,24 @@ class ImportSorter {
 			return;
 		}
 
+		const initialCommentBlock = file.match(new RegExp(commentBlockRegexp));
 		const imports = file.match(new RegExp(importRegexp, 'gm'));
 		const lastImport = imports[imports.length - 1];
 
 		const rest = file.slice(file.indexOf(lastImport) + lastImport.length);
 
 		// Collect different import types
+		const comments = [
+			...(initialCommentBlock && initialCommentBlock.length > 0
+				? initialCommentBlock
+				: []),
+		];
 		const nodeImports = [];
 		const rootRelativeImports = [];
 		const relativeImports = [];
 
 		imports.map(imp => {
-			const [_, path] = imp.match(new RegExp(importRegexp, 'm'));
+			const [path] = imp.match(new RegExp(pathRegexp, "m"));
 
 			if (utils.isRelativeImport(path)) {
 				relativeImports.push(imp);
@@ -43,7 +55,12 @@ class ImportSorter {
 		this.numberOfChangedFiles++;
 
 		// Sort imports and append rest of the file
-		return [...nodeImports, ...rootRelativeImports, ...relativeImports].join('\n').concat(rest);
+		return [
+			...comments, 
+			...nodeImports, 
+			...rootRelativeImports, 
+			...relativeImports
+		].join('\n').concat(rest);
 	}
 
 	async run() {
